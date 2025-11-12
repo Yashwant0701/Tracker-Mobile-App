@@ -19,3 +19,17 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+// ✅ FIX: No afterEvaluate — use allprojects { configurations.all } instead
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    configurations.all {
+        resolutionStrategy {
+            // Force consistent version of Google Play Services Location
+            force "com.google.android.gms:play-services-location:21.3.0"
+        }
+    }
+}
