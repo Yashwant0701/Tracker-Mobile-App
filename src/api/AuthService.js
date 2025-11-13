@@ -37,7 +37,6 @@ export const login = async (userName, password) => {
       deviceId: "5x4pxqndsp7m8muxq9n",
     });
 
-   // console.log("login response is,", response)
 
     if (response.data?.token || response.data?.referenceToken) {
       await saveTokens(response.data.token, response.data.referenceToken);
@@ -51,7 +50,6 @@ export const login = async (userName, password) => {
 
 // LOGOUT
 export const logout = async (currentUser) => {
-  //console.log("logoutuser account id is,", currentUser.accountId)
   try {
     const tokens = await getTokens();
 
@@ -71,7 +69,6 @@ export const logout = async (currentUser) => {
         headers: { LocationId: 1 },
       }
     );
-   // console.log("logout user response is," , response)
 
     return response;
   } catch (error) {
@@ -183,13 +180,10 @@ export const fetchProfileImage = async ({ thumbnailUrl }) => {
 export const fetchRecentVisits = async (accountId) => {
   try {
     if (!accountId) throw new Error("AccountId is required");
-    // const url = `https://hims.careaxes.app/fernandez-api/api/SalesVisit/FetchVisits?AccountId=${accountId}`;
-    // const response = await axios.get(url);
+
     const response = await careaxesPortalUATApi.get(`SalesVisit/FetchVisits?AccountId=${accountId}`);
-   // console.log("Fetch recent visits response:", response);
     return response;
   } catch (error) {
-    //console.log("Error fetching recent visits:", error);
     return error.response;
   }
 };

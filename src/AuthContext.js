@@ -21,7 +21,7 @@ export const AuthProvider = ({ children }) => {
         if (usersStr) setAllUsers(JSON.parse(usersStr));
         if (loginResultStr) setLoginResult(JSON.parse(loginResultStr));
       } catch (error) {
-        //console.log("Error loading user from storage:", error);
+        //ignore
       } finally {
         setIsLoading(false);
       }

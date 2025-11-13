@@ -37,8 +37,6 @@ const LoginScreen = ({ navigation }) => {
     try {
       const formattedUserName = `1:${userName}`;
       const result = await login(formattedUserName, password);
-      //console.log("Login Result:", result);
-
       if (result?.status === 200 && result.data) {
         await setLoginApiResult(result.data);
         const usersResponse = await fetchUserListByMobile(formattedUserName);
@@ -62,7 +60,6 @@ const LoginScreen = ({ navigation }) => {
         Alert.alert("Login Failed", result?.data || "Invalid credentials");
       }
     } catch (error) {
-      console.error("Login Error:", error);
       Alert.alert("Error", "Something went wrong. Please try again.");
     } finally {
       setLoading(false);

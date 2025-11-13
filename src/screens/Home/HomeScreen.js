@@ -154,7 +154,7 @@ const HomeScreen = ({ navigation }) => {
         setCurrentAddress(label);
       } else setCurrentAddress("Unknown location");
     } catch (err) {
-      //console.warn("Location fetch error:", err);
+      //err
     }
   };
 
@@ -171,7 +171,6 @@ const HomeScreen = ({ navigation }) => {
       await AsyncStorage.setItem(APP_STATE_KEY, JSON.stringify(data));
     } catch (e) {
       // ignore persist errors
-      //console.warn("Persist app state failed:", e);
     }
   };
 
@@ -198,7 +197,7 @@ const HomeScreen = ({ navigation }) => {
         setSecondsElapsed(state.secondsElapsed || 0);
       }
     } catch (err) {
-      //console.warn("Failed to restore:", err);
+      //err
     }
   };
 
@@ -288,7 +287,6 @@ const HomeScreen = ({ navigation }) => {
 
     try {
       const result = await addVisit(payload);
-      //console.log("Add visit result:", result);
 
       const ok =
         result === "success" ||
@@ -311,10 +309,8 @@ const HomeScreen = ({ navigation }) => {
         navigation.navigate("RecentVisits");
       } else {
         Alert.alert("Error", "Failed to add visit.");
-        //console.warn("addVisit failed:", result);
       }
     } catch (err) {
-      //console.error("stopVisit error:", err);
       Alert.alert("Error", "Something went wrong while adding visit.");
     }
   };
@@ -325,14 +321,8 @@ const HomeScreen = ({ navigation }) => {
   const fetchAllLocations = async () => {
     try {
       const data = await fetchLocations();
-      const staticLocation = {
-        id: 4,
-        value: "",
-        name: "Capital Park",
-        optionalText1: null,
-        optionalText: null,
-      };
-      setLocationsList([...(data || []), staticLocation]);
+     
+      setLocationsList(data);
     } catch {
       setLocationsList([]);
     }
@@ -382,34 +372,15 @@ const HomeScreen = ({ navigation }) => {
     try {
       const providers = await fetchDoctorsByLocation(loc.name);
 
-      const customDoctor = {
-        providerId: 2603,
-        specializationId: 101,
-        accountId: 888888,
-        providerName: "John Doe",
-        experience: 10,
-        gender: "M",
-        specializations: "GENERAL PHYSICIAN",
-        location: loc.name,
-        consultationCharges: 500.0,
-        currencySymbol: "₹",
-        locationId: 1,
-        isOnline: true,
-        salutationName: "Dr",
-      };
-
-      setDoctorsList([...(providers || []), customDoctor]);
+      setDoctorsList(providers);
     } catch (err) {
-     // console.log("Error fetching doctors:", err);
       setDoctorsList([]);
     } finally {
       setLoadingDoctors(false);
     }
   };
 
-  // -------------------------
   // handleSelectDoctor -> CLOSE modal & clear isEditing so timer resumes if needed
-  // -------------------------
   const handleSelectDoctor = (doc) => {
     setDoctorName(`${doc.salutationName ? doc.salutationName + " " : ""}${doc.providerName}`);
     setSelectedProvider(doc);
@@ -428,9 +399,7 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  // -------------------------
   // Filtering helpers
-  // -------------------------
   const handleLocationChange = (text) => {
     setLocation(text);
     setSelectedLocationObj(null);
@@ -476,9 +445,7 @@ const HomeScreen = ({ navigation }) => {
     openVisitModal(false);
   };
 
-  // -------------------------
   // Logout
-  // -------------------------
   const logoutUser = async () => {
     try {
       const result = await logout(currentUser);
@@ -493,9 +460,7 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  // -------------------------
   // Toggle duty (on/off)
-  // -------------------------
   const handleToggleDuty = async () => {
     try {
       //  Prevent duty toggle while visit timer is running
@@ -541,9 +506,7 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  // -------------------------
   // UI
-  // -------------------------
   return (
     <View style={styles.container}>
       {/* Header */}

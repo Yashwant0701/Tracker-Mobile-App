@@ -76,7 +76,6 @@ const calculateDuration = (checkinTime, checkoutTime) => {
       minutes > 1 ? "s" : ""
     } spent`;
   } catch (err) {
-    //console.log("Duration calc error:", err);
     return "N/A";
   }
 };
@@ -89,12 +88,11 @@ const calculateDuration = (checkinTime, checkoutTime) => {
         const response = await fetchRecentVisits(currentUser.accountId);
         if (response?.status === 200 && Array.isArray(response.data)) {
           setVisits(response.data);
-          //console.log("Fetched visits:", response.data);
         } else {
           setVisits([]);
         }
       } catch (error) {
-        //console.log("Failed to fetch visits:", error);
+        //
       } finally {
         setLoading(false);
       }
@@ -168,7 +166,6 @@ const calculateDuration = (checkinTime, checkoutTime) => {
       {/* Floating Filter Button */}
       <TouchableOpacity
         style={styles.filterButton}
-        //onPress={() => console.log("Filter pressed")}
       >
         <Image
           source={require("../../assets/images/filterIcon.png")}
