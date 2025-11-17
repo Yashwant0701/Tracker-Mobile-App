@@ -35,10 +35,28 @@ const LoginScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
+      // STEP 1️⃣ — Try admin login first (without prefix)
+      let adminResult = await login(userName, password);
+
+      if (adminResult?.status === 200 && adminResult.data) {
+        const roleName = adminResult.data.roleName?.toUpperCase();
+
+        if (roleName === "ADMIN") {
+          // ✅ Admin Login Flow
+          await setLoginApiResult(adminResult.data);
+          await loginUser(adminResult.data);
+          Alert.alert("Success", "Admin login successful!");
+          navigation.replace("Analytics");
+          return;
+        }
+      }
+
+      // STEP 2️⃣ — If not admin, try Patient login (with 1: prefix)
       const formattedUserName = `1:${userName}`;
-      const result = await login(formattedUserName, password);
-      if (result?.status === 200 && result.data) {
-        await setLoginApiResult(result.data);
+      const patientResult = await login(formattedUserName, password);
+
+      if (patientResult?.status === 200 && patientResult.data) {
+        await setLoginApiResult(patientResult.data);
         const usersResponse = await fetchUserListByMobile(formattedUserName);
 
         if (usersResponse?.status === 200) {
@@ -57,9 +75,10 @@ const LoginScreen = ({ navigation }) => {
           Alert.alert("Error", "Failed to fetch linked users.");
         }
       } else {
-        Alert.alert("Login Failed", result?.data || "Invalid credentials");
+        Alert.alert("Login Failed", "Invalid credentials or role.");
       }
     } catch (error) {
+      console.error("Login error:", error);
       Alert.alert("Error", "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
@@ -110,10 +129,10 @@ const LoginScreen = ({ navigation }) => {
             value={password}
             onChangeText={setPassword}
             secureTextEntry={true}
-            maskCharacter="*"   // ← this makes the field display '*' for each char
+            maskCharacter="*"
           />
 
-          {/* Login Button (Using CustomButton) */}
+          {/* Login Button */}
           <CustomButton
             title={loading ? "Logging In..." : "Login"}
             onPress={handleLogin}

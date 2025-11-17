@@ -1,4 +1,4 @@
-// App.js
+// App.tsx
 import React, { useContext } from "react";
 import {
   StatusBar,
@@ -16,6 +16,8 @@ import { AuthProvider, AuthContext } from "./src/AuthContext";
 import LoginScreen from "./src/screens/Login/LoginScreen";
 import HomeScreen from "./src/screens/Home/HomeScreen";
 import RecentVisits from "./src/screens/RecentVisits/RecentVisits";
+import Analytics from "./src/screens/Analytics/Analytics";
+import MapScreen from "./src/screens/MapScreen/MapScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -30,17 +32,29 @@ const AppNavigator = () => {
     );
   }
 
+  // --------------------------
+  // ROLE-BASED INITIAL SCREEN
+  // --------------------------
+  const getInitialRoute = () => {
+    if (!currentUser) return "Login";
+
+    if (currentUser.roleName === "ADMIN") return "Analytics";
+    else return "Home"; // patient / normal user
+  };
+
   return (
     <NavigationContainer>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
           <Stack.Navigator
             screenOptions={{ headerShown: false }}
-            initialRouteName={currentUser ? "Home" : "Login"}
+            initialRouteName={getInitialRoute()}
           >
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Home" component={HomeScreen} />
             <Stack.Screen name="RecentVisits" component={RecentVisits} />
+            <Stack.Screen name="Analytics" component={Analytics} />
+            <Stack.Screen name="Map" component={MapScreen} />
           </Stack.Navigator>
         </View>
       </SafeAreaView>
@@ -58,6 +72,7 @@ const App = () => {
         backgroundColor="transparent"
         translucent
       />
+
       {/* Wrap everything in AuthProvider */}
       <AuthProvider>
         <AppNavigator />

@@ -26,6 +26,7 @@ import {
   logout,
   onDutyLogin,
   offDutyLogout,
+  updateLocation, // <-- new import
 } from "../../api/AuthService";
 import Icon from "react-native-vector-icons/Ionicons";
 import {
@@ -37,6 +38,7 @@ import { clearTokens } from "../../../tokenStorage";
 import Geolocation from "react-native-geolocation-service";
 
 const APP_STATE_KEY = "appState";
+const LOCATION_INTERVAL_MS = 5000; // 5 seconds
 
 const HomeScreen = ({ navigation }) => {
   const { currentUser, setCurrentUser } = useContext(AuthContext);
@@ -66,7 +68,10 @@ const HomeScreen = ({ navigation }) => {
   const [currentAddress, setCurrentAddress] = useState(null);
   const [gpsCoords, setGpsCoords] = useState(null);
 
-    // ✅ derived state for logout icon visibility
+  // location updater interval ref
+  const locationIntervalRef = useRef(null);
+
+  // derived state for logout icon visibility
   const isTimerRunning = visitStarted;
 
   // -------------------------
@@ -106,7 +111,7 @@ const HomeScreen = ({ navigation }) => {
   };
 
   // -------------------------
-  // Fetch GPS + Reverse geocode
+  // Fetch GPS + Reverse geocode (for display/address)
   // -------------------------
   const fetchCurrentAddress = async () => {
     try {
@@ -154,9 +159,65 @@ const HomeScreen = ({ navigation }) => {
         setCurrentAddress(label);
       } else setCurrentAddress("Unknown location");
     } catch (err) {
-      //err
+      // don't surface heavy errors to user here
+      console.warn("Location fetch error:", err);
     }
   };
+
+  // -------------------------
+  // Location update: send to backend every 5s (always-on)
+  // -------------------------
+  const sendLocationUpdate = async () => {
+    try {
+      // Must have a logged-in user
+      if (!currentUser?.accountId) return;
+
+      const permission = await getLocationPermission();
+      if (!permission.granted) return;
+
+      // get a fresh position; use low-accuracy for speed (reduce battery)
+      Geolocation.getCurrentPosition(
+        async (pos) => {
+          const { latitude, longitude } = pos.coords;
+          setGpsCoords({ latitude, longitude });
+          try {
+            await updateLocation({
+              userId: currentUser.accountId,
+              lat: latitude,
+              lon: longitude
+            });
+
+          } catch (err) {
+            // just log; do not block
+            console.warn("Failed to send location update:", err);
+          }
+        },
+        (err) => {
+          // location read failure — log but don't spam user
+          // console.warn("Periodic location error:", err);
+        },
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 2000 }
+      );
+    } catch (err) {
+      console.warn("sendLocationUpdate fatal:", err);
+    }
+  };
+
+  // start periodic updater (every 5s) on mount, persist across restarts because it runs at mount
+  useEffect(() => {
+    // start immediately, then every 5s
+    sendLocationUpdate(); // initial immediate call
+    locationIntervalRef.current = setInterval(sendLocationUpdate, LOCATION_INTERVAL_MS);
+
+    return () => {
+      if (locationIntervalRef.current) {
+        clearInterval(locationIntervalRef.current);
+        locationIntervalRef.current = null;
+      }
+    };
+    // Intentionally run once on mount; depends on currentUser updated value if user logs in later
+    // If you need it to restart when currentUser changes, include currentUser in deps.
+  }, []); // run only once on component mount to persist across restarts
 
   // -------------------------
   // Persist / restore app state
@@ -197,7 +258,7 @@ const HomeScreen = ({ navigation }) => {
         setSecondsElapsed(state.secondsElapsed || 0);
       }
     } catch (err) {
-      //err
+      // ignore
     }
   };
 
@@ -221,13 +282,9 @@ const HomeScreen = ({ navigation }) => {
   // -------------------------
   useEffect(() => {
     if (visitStarted && !isEditing) {
-      // start or resume timer
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
+      if (timerRef.current) clearInterval(timerRef.current);
       timerRef.current = setInterval(() => setSecondsElapsed((prev) => prev + 1), 1000);
     } else {
-      // pause timer when not visiting OR when editing
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -316,12 +373,11 @@ const HomeScreen = ({ navigation }) => {
   };
 
   // -------------------------
-  // Locations (API + static)
+  // Locations (API)
   // -------------------------
   const fetchAllLocations = async () => {
     try {
       const data = await fetchLocations();
-     
       setLocationsList(data);
     } catch {
       setLocationsList([]);
@@ -342,12 +398,11 @@ const HomeScreen = ({ navigation }) => {
   // -------------------------
   const closeModal = () => {
     setModalVisible(false);
-    // clear editing flag so timer can resume (if visitStarted)
     setIsEditing(false);
   };
 
   // -------------------------
-  // Select location -> fetch doctors + add custom doctor
+  // Select location -> fetch doctors
   // -------------------------
   const handleSelectLocation = async (loc) => {
     if (!currentAddress) await fetchCurrentAddress();
@@ -371,7 +426,6 @@ const HomeScreen = ({ navigation }) => {
     setLoadingDoctors(true);
     try {
       const providers = await fetchDoctorsByLocation(loc.name);
-
       setDoctorsList(providers);
     } catch (err) {
       setDoctorsList([]);
@@ -506,7 +560,9 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
+  // -------------------------
   // UI
+  // -------------------------
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -525,7 +581,7 @@ const HomeScreen = ({ navigation }) => {
           </View>
         </View>
 
-          {/*  Logout Icon — hidden when timer is running */}
+        {/*  Logout Icon — hidden when timer is running */}
         {!isTimerRunning && (
           <TouchableOpacity style={styles.bellButton} onPress={logoutUser}>
             <Image

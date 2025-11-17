@@ -4,12 +4,12 @@ import { saveTokens, getTokens, clearTokens } from "../../tokenStorage"
 const BASE_URL_CAREAXES_PATIENT_PORTAL = process.env.BASE_URL_CAREAXES_PATIENT_PORTAL;
 const BASE_URL_LIVE = process.env.BASE_URL_LIVE;
 const BASE_URL_PROFILEIMG = process.env.BASE_URL_PROFILEIMG;
-
+const BASE_URL_CAREAXES_LOCATION = process.env.BASE_URL_CAREAXES_LOCATION;
 
 // Axios instances
 const careaxesPortalUATApi = axios.create({ baseURL: BASE_URL_CAREAXES_PATIENT_PORTAL });
 const LiveApi = axios.create({ baseURL: BASE_URL_LIVE });
-
+const LocationApi = axios.create({ baseURL: BASE_URL_CAREAXES_LOCATION });
 
 // Attach token automatically for all instances
 const attachAuthInterceptor = (apiInstance) => {
@@ -23,6 +23,7 @@ const attachAuthInterceptor = (apiInstance) => {
 };
 
 attachAuthInterceptor(careaxesPortalUATApi);
+attachAuthInterceptor(LocationApi);
 
 
 // LOGIN
@@ -282,5 +283,72 @@ export const offDutyLogout = async (accountId, currentAddress, dayTrackerRequest
   } catch (error) {
     console.error(" Error in OffDuty API:", error);
     return error.response || null;
+  }
+};
+
+export const updateLocation = async ({ userId, lat, lon }) => {
+  try {
+    const response = await LocationApi.post("update_location", {
+      user_id: userId,
+      lat,
+      lon
+    });
+
+    // API returns { "status": "ok" }
+    if (response?.data?.status === "ok") {
+      return { success: true };
+    } else {
+      return {
+        success: false,
+        message: "Unexpected response from server",
+        data: response?.data
+      };
+    }
+
+  } catch (error) {
+    console.error("updateLocation Error:", error);
+
+    return {
+      success: false,
+      message: error?.response?.data?.message || "Failed to update location",
+      error
+    };
+  }
+};
+
+
+// GET USER LOCATION (ADMIN ANALYTICS)
+export const getLocation = async (accountId) => {
+  try {
+    if (!accountId) throw new Error("AccountId is required");
+
+    const response = await LocationApi.get(`get_location/${accountId}`);
+
+    // Success case
+    if (response?.data?.lat && response?.data?.lon) {
+      return {
+        success: true,
+        lat: response.data.lat,
+        lon: response.data.lon,
+        timestamp: response.data.timestamp,
+      };
+    }
+
+    // No lat/lon present -> NOT FOUND
+    return { success: false, message: "Location not found" };
+
+  } catch (error) {
+
+    // Extract accurate server error message
+    const serverMsg =
+      error?.response?.data?.error ||     
+      error?.response?.data?.message || 
+      "Failed to fetch location";
+
+    return {
+      success: false,
+      message: serverMsg,
+      error
+    };
   }
 };

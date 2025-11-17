@@ -21,6 +21,7 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace "com.sujatracker"
+
     defaultConfig {
         applicationId "com.sujatracker"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -36,14 +37,14 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
-         release {
-        if (project.hasProperty('MYAPP_UPLOAD_STORE_FILE')) {
-            storeFile file(MYAPP_UPLOAD_STORE_FILE)
-            storePassword MYAPP_UPLOAD_STORE_PASSWORD
-            keyAlias MYAPP_UPLOAD_KEY_ALIAS
-            keyPassword MYAPP_UPLOAD_KEY_PASSWORD
+        release {
+            if (project.hasProperty('MYAPP_UPLOAD_STORE_FILE')) {
+                storeFile file(MYAPP_UPLOAD_STORE_FILE)
+                storePassword MYAPP_UPLOAD_STORE_PASSWORD
+                keyAlias MYAPP_UPLOAD_KEY_ALIAS
+                keyPassword MYAPP_UPLOAD_KEY_PASSWORD
+            }
         }
-    }
     }
 
     buildTypes {
@@ -51,8 +52,12 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            signingConfig signingConfigs.debug
+            //  Use release keystore, not debug
+            signingConfig signingConfigs.release
+
+            // Optimization settings
             minifyEnabled enableProguardInReleaseBuilds
+            shrinkResources false
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }
@@ -62,7 +67,7 @@ dependencies {
     // Core React Native
     implementation("com.facebook.react:react-android")
 
-    // ✅ Force use of the compatible Google Play Services location library
+    //  Force use of the compatible Google Play Services location library
     implementation("com.google.android.gms:play-services-location:21.3.0")
 
     // Hermes or JSC
