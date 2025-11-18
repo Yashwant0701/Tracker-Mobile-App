@@ -21,6 +21,7 @@ const MapScreen = () => {
     const fetchLocation = async (isInitial = false) => {
       try {
         const resp = await getLocation(accountId);
+        console.log("Location API response:", resp);
 
         // ---------- Handle Not Found ----------
         if (resp?.statusCode === 404 || resp?.message === "Not Found") {

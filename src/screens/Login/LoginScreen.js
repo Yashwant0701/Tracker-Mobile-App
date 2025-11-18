@@ -35,23 +35,21 @@ const LoginScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
-      // STEP 1️⃣ — Try admin login first (without prefix)
       let adminResult = await login(userName, password);
 
       if (adminResult?.status === 200 && adminResult.data) {
         const roleName = adminResult.data.roleName?.toUpperCase();
 
         if (roleName === "ADMIN") {
-          // ✅ Admin Login Flow
+          //  Admin Login Flow
           await setLoginApiResult(adminResult.data);
           await loginUser(adminResult.data);
-          Alert.alert("Success", "Admin login successful!");
           navigation.replace("Analytics");
           return;
         }
       }
 
-      // STEP 2️⃣ — If not admin, try Patient login (with 1: prefix)
+      // STEP 2 — If not admin, try Patient login (with 1: prefix)
       const formattedUserName = `1:${userName}`;
       const patientResult = await login(formattedUserName, password);
 

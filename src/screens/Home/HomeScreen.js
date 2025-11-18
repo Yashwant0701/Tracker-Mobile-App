@@ -181,11 +181,12 @@ const HomeScreen = ({ navigation }) => {
           const { latitude, longitude } = pos.coords;
           setGpsCoords({ latitude, longitude });
           try {
-            await updateLocation({
-              userId: currentUser.accountId,
+          await updateLocation({
+              userId: `${currentUser.accountId}`,
               lat: latitude,
               lon: longitude
             });
+           
 
           } catch (err) {
             // just log; do not block
@@ -378,7 +379,15 @@ const HomeScreen = ({ navigation }) => {
   const fetchAllLocations = async () => {
     try {
       const data = await fetchLocations();
-      setLocationsList(data);
+      //setLocationsList(data);
+       const staticLocation = {
+        id: 4,
+        value: "",
+        name: "Capital Park",
+        optionalText1: null,
+        optionalText: null,
+      };
+      setLocationsList([...(data || []), staticLocation]);
     } catch {
       setLocationsList([]);
     }
@@ -426,7 +435,24 @@ const HomeScreen = ({ navigation }) => {
     setLoadingDoctors(true);
     try {
       const providers = await fetchDoctorsByLocation(loc.name);
-      setDoctorsList(providers);
+      //setDoctorsList(providers);
+       const customDoctor = {
+        providerId: 2603,
+        specializationId: 101,
+        accountId: 888888,
+        providerName: "John Doe",
+        experience: 10,
+        gender: "M",
+        specializations: "GENERAL PHYSICIAN",
+        location: loc.name,
+        consultationCharges: 500.0,
+        currencySymbol: "₹",
+        locationId: 1,
+        isOnline: true,
+        salutationName: "Dr",
+      };
+
+      setDoctorsList([...(providers || []), customDoctor]);
     } catch (err) {
       setDoctorsList([]);
     } finally {

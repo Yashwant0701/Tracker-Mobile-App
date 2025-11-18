@@ -16,7 +16,7 @@ const RecentVisits = ({ navigation }) => {
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  //  Format date as DD-MM-YYYY (Asia/Kolkata)
+  // Format date as DD-MM-YYYY (Asia/Kolkata)
   const formatDate = (isoDate) => {
     if (!isoDate) return "N/A";
     const date = new Date(isoDate);
@@ -29,7 +29,7 @@ const RecentVisits = ({ navigation }) => {
     return new Intl.DateTimeFormat("en-GB", options).format(date);
   };
 
-  //  Format time as hh:mm AM/PM (Asia/Kolkata)
+  // Format time as hh:mm AM/PM (Asia/Kolkata)
   const formatTime = (isoDate) => {
     if (!isoDate) return "N/A";
     const date = new Date(isoDate);
@@ -42,61 +42,65 @@ const RecentVisits = ({ navigation }) => {
     return new Intl.DateTimeFormat("en-US", options).format(date);
   };
 
-//  Duration calculation (returns like "1 hr 20 mins" or "45 secs")
-const calculateDuration = (checkinTime, checkoutTime) => {
-  if (!checkinTime || !checkoutTime) return "0 sec";
+  // Duration calculation
+  const calculateDuration = (checkinTime, checkoutTime) => {
+    if (!checkinTime || !checkoutTime) return "0 sec";
 
-  try {
-    // Convert to Date objects
-    const start = new Date(checkinTime);
-    const end = new Date(checkoutTime);
+    try {
+      const start = new Date(checkinTime);
+      const end = new Date(checkoutTime);
+      const diffMs = Math.abs(end - start);
 
-    // Get absolute difference in milliseconds
-    const diffMs = Math.abs(end - start);
+      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
 
-    // Convert to hours, minutes, and seconds
-    const hours = Math.floor(diffMs / (1000 * 60 * 60));
-    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
-
-    //  Build a human-readable string
-    if (hours === 0 && minutes === 0 && seconds < 60) {
-      return `${seconds} sec${seconds !== 1 ? "s" : ""} spent`;
+      if (hours === 0 && minutes === 0 && seconds < 60) {
+        return `${seconds} sec${seconds !== 1 ? "s" : ""} spent`;
+      }
+      if (hours === 0 && minutes === 0) {
+        return "<1 mts spent";
+      }
+      if (hours === 0) {
+        return `${minutes} mt${minutes !== 1 ? "s" : ""} spent`;
+      }
+      if (minutes === 0) {
+        return `${hours} hr${hours > 1 ? "s" : ""} spent`;
+      }
+      return `${hours} hr${hours > 1 ? "s" : ""} ${minutes} mt${
+        minutes > 1 ? "s" : ""
+      } spent`;
+    } catch (err) {
+      return "N/A";
     }
-    if (hours === 0 && minutes === 0) {
-      return "<1 mts spent";
-    }
-    if (hours === 0) {
-      return `${minutes} mt${minutes !== 1 ? "s" : ""} spent`;
-    }
-    if (minutes === 0) {
-      return `${hours} hr${hours > 1 ? "s" : ""} spent`;
-    }
-    return `${hours} hr${hours > 1 ? "s" : ""} ${minutes} mt${
-      minutes > 1 ? "s" : ""
-    } spent`;
-  } catch (err) {
-    return "N/A";
-  }
-};
+  };
 
-  //  Fetch recent visits from API
+  // Fetch recent visits from API
   useEffect(() => {
     const getVisits = async () => {
       try {
         if (!currentUser?.accountId) return;
+
         const response = await fetchRecentVisits(currentUser.accountId);
+
         if (response?.status === 200 && Array.isArray(response.data)) {
-          setVisits(response.data);
+          //  SORTING NEWEST FIRST
+          console.log("Recent Visits API response:", response.data);
+          const sortedVisits = response.data.sort(
+            (a, b) => new Date(b.checkinTime) - new Date(a.checkinTime)
+          );
+
+          setVisits(sortedVisits);
         } else {
           setVisits([]);
         }
       } catch (error) {
-        //
+        setVisits([]);
       } finally {
         setLoading(false);
       }
     };
+
     getVisits();
   }, [currentUser]);
 
@@ -164,9 +168,7 @@ const calculateDuration = (checkinTime, checkoutTime) => {
       </ScrollView>
 
       {/* Floating Filter Button */}
-      <TouchableOpacity
-        style={styles.filterButton}
-      >
+      <TouchableOpacity style={styles.filterButton}>
         <Image
           source={require("../../assets/images/filterIcon.png")}
           resizeMode="contain"
