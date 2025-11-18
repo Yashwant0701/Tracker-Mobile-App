@@ -85,7 +85,6 @@ const RecentVisits = ({ navigation }) => {
 
         if (response?.status === 200 && Array.isArray(response.data)) {
           //  SORTING NEWEST FIRST
-          console.log("Recent Visits API response:", response.data);
           const sortedVisits = response.data.sort(
             (a, b) => new Date(b.checkinTime) - new Date(a.checkinTime)
           );

@@ -160,7 +160,7 @@ const HomeScreen = ({ navigation }) => {
       } else setCurrentAddress("Unknown location");
     } catch (err) {
       // don't surface heavy errors to user here
-      console.warn("Location fetch error:", err);
+      return;
     }
   };
 
@@ -190,17 +190,17 @@ const HomeScreen = ({ navigation }) => {
 
           } catch (err) {
             // just log; do not block
-            console.warn("Failed to send location update:", err);
+            return;
           }
         },
         (err) => {
           // location read failure — log but don't spam user
-          // console.warn("Periodic location error:", err);
+          return;
         },
         { enableHighAccuracy: false, timeout: 8000, maximumAge: 2000 }
       );
     } catch (err) {
-      console.warn("sendLocationUpdate fatal:", err);
+      return;
     }
   };
 
