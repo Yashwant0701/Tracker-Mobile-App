@@ -339,7 +339,8 @@ const HomeScreen = ({ navigation }) => {
       checkoutTime,
       locationId: selectedProvider.locationId,
       createdBy: currentUser.accountId,
-      providerId: selectedProvider.providerId,
+      providerId: selectedProvider.referralDoctorId,
+      // selectedProvider.referralDoctorId 
       gpsLocation: currentAddress || "Unknown",
     };
 
@@ -358,12 +359,13 @@ const HomeScreen = ({ navigation }) => {
         setSecondsElapsed(0);
         setSelectedProvider(null);
         setCheckinTime(null);
+        setDoctorName("");
+        setLocation("");
         try {
           await AsyncStorage.removeItem(APP_STATE_KEY);
         } catch (e) {
           // ignore
         }
-        setIsOnDuty(false); // optional per your business logic
         navigation.navigate("RecentVisits");
       } else {
         Alert.alert("Error", "Failed to add visit.");
@@ -396,11 +398,44 @@ const HomeScreen = ({ navigation }) => {
   // -------------------------
   // Open modal (edit flag)
   // -------------------------
-  const openVisitModal = async (isEdit = false) => {
-    setIsEditing(isEdit);
-    setModalVisible(true);
-    await fetchAllLocations();
-  };
+  // const openVisitModal = async (isEdit = false) => {
+  //   setIsEditing(isEdit);
+  //   setModalVisible(true);
+  //   await fetchAllLocations();
+  // };
+
+  // -------------------------
+// Open modal (edit flag)
+// -------------------------
+const openVisitModal = async (isEdit = false) => {
+  setIsEditing(isEdit);
+
+  // If editing, prefill fields from selectedProvider safely
+  if (isEdit && selectedProvider) {
+    // set location text and selectedLocationObj if available
+    if (selectedProvider.location || selectedProvider.locationName) {
+      const locName = selectedProvider.location || selectedProvider.locationName;
+      setLocation(locName);
+
+      // create a minimal selectedLocationObj so other code behaves consistently
+      setSelectedLocationObj({
+        id: selectedProvider.locationId || null,
+        name: locName,
+        value: "",
+      });
+    }
+
+    // Prefill doctorName using salutation + providerName or fullName fallback
+    const providerLabel =
+      `${selectedProvider.salutationName ? selectedProvider.salutationName + " " : ""}` +
+      (selectedProvider.providerName || selectedProvider.fullName || "");
+    setDoctorName(providerLabel);
+  }
+
+  setModalVisible(true);
+  await fetchAllLocations();
+};
+
 
   // -------------------------
   // CENTRAL closeModal() — ensures isEditing is cleared whenever closed
@@ -416,16 +451,16 @@ const HomeScreen = ({ navigation }) => {
   const handleSelectLocation = async (loc) => {
     if (!currentAddress) await fetchCurrentAddress();
 
-    const gpsLower = currentAddress?.toLowerCase() || "";
-    const locLower = loc.name?.toLowerCase() || "";
+    // const gpsLower = currentAddress?.toLowerCase() || "";
+    // const locLower = loc.name?.toLowerCase() || "";
 
-    if (!gpsLower.includes(locLower)) {
-      Alert.alert(
-        "Location Mismatch",
-        "Your GPS location does not match the selected facility."
-      );
-      return;
-    }
+    // if (!gpsLower.includes(locLower)) {
+    //   Alert.alert(
+    //     "Location Mismatch",
+    //     "Your GPS location does not match the selected facility."
+    //   );
+    //   return;
+    // }
 
     setLocation(loc.name);
     setFilteredLocations([]);
@@ -451,7 +486,6 @@ const HomeScreen = ({ navigation }) => {
         isOnline: true,
         salutationName: "Dr",
       };
-
       setDoctorsList([...(providers || []), customDoctor]);
     } catch (err) {
       setDoctorsList([]);
@@ -509,7 +543,7 @@ const HomeScreen = ({ navigation }) => {
 
     const typed = text.toLowerCase();
     const filtered = doctorsList.filter((doc) =>
-      doc.providerName?.toLowerCase().includes(typed)
+      doc.fullName?.toLowerCase().includes(typed)
     );
     setFilteredDoctors(filtered);
   };
@@ -614,8 +648,8 @@ const HomeScreen = ({ navigation }) => {
               source={require("../../assets/images/logoutIcon.png")}
               style={styles.logoutIcon}
             />
-          </TouchableOpacity>
-        )}
+          </TouchableOpacity>      
+         )} 
         <TouchableOpacity style={styles.bellButton}>
           <Image source={require("../../assets/images/notificationsIcon.png")} style={styles.bellIcon} />
         </TouchableOpacity>
@@ -671,14 +705,13 @@ const HomeScreen = ({ navigation }) => {
           <View style={styles.footerCardActive}>
             <View style={styles.footerTextContainer}>
               <Text style={styles.doctorNameText}>
-                {selectedProvider.salutationName ? `${selectedProvider.salutationName} ` : ""}
-                {selectedProvider.providerName}
+                {selectedProvider.fullName ? `${selectedProvider.fullName} ` : ""}
               </Text>
               <Text style={styles.visitDetailText}>
                 {new Date().toLocaleDateString()} |{" "}
                 {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
               </Text>
-              <Text style={styles.visitDetailText}>{selectedProvider.location || ""}</Text>
+              <Text style={styles.visitDetailText}>{selectedProvider.locationName || ""}</Text>
             </View>
             <TouchableOpacity onPress={() => openVisitModal(true)}>
               <Image source={require("../../assets/images/editIcon.png")} style={styles.editIcon} />
@@ -752,8 +785,8 @@ const HomeScreen = ({ navigation }) => {
                       renderItem={({ item }) => (
                         <TouchableOpacity style={styles.dropdownItem} onPress={() => handleSelectDoctor(item)}>
                           <Text style={styles.dropdownText}>
-                            {item.salutationName ? `${item.salutationName} ` : ""}
-                            {item.providerName}
+                            
+                            {item.fullName ? item.fullName : ''}
                           </Text>
                         </TouchableOpacity>
                       )}

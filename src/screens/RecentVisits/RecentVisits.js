@@ -88,7 +88,6 @@ const RecentVisits = ({ navigation }) => {
           const sortedVisits = response.data.sort(
             (a, b) => new Date(b.checkinTime) - new Date(a.checkinTime)
           );
-
           setVisits(sortedVisits);
         } else {
           setVisits([]);

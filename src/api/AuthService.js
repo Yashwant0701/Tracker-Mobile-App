@@ -202,16 +202,21 @@ export const fetchLocations = async () => {
 export const fetchDoctorsByLocation = async (selectedLocationName) => {
   try {
     const response = await careaxesPortalUATApi.post(
-      "providers/fetch-provider-list-items",
-      { consultationName: "Physical Consultation" }
+      "referralDoctor/fetch",
+      {
+    "pageSize": 10,
+    "pageIndex":1,
+    "LocationId":0
+}
     );
+
 
     if (response.status === 200 && Array.isArray(response.data)) {
       // Filter doctors whose location matches the selected location
       const filteredDoctors = response.data.filter(
         (doctor) =>
-          doctor.location &&
-          doctor.location.trim().toLowerCase() === selectedLocationName.trim().toLowerCase()
+          doctor.locationName &&
+          doctor.locationName.trim().toLowerCase() === selectedLocationName.trim().toLowerCase()
       );
       return filteredDoctors;
     } else {
@@ -350,5 +355,33 @@ export const getLocation = async (accountId) => {
       message: serverMsg,
       error
     };
+  }
+};
+
+
+// GET Sales Users (for Analytics dropdown)
+export const getSalesUsers = async ({ pageSize = 10, pageIndex = 1 }) => {
+  try {
+    const payload = {
+      PageSize: pageSize,
+      PageIndex: pageIndex,
+    };
+
+    const response = await careaxesPortalUATApi.post("SalesVisit/GetSalesUsers", payload);
+
+    // If backend returns array directly
+    if (response?.status === 200 && Array.isArray(response.data)) {
+      return response.data;
+    }
+
+    // If backend wraps data
+    if (response?.status === 200 && response.data && Array.isArray(response.data.items)) {
+      return response.data.items;
+    }
+
+    return [];
+  } catch (error) {
+    console.error("getSalesUsers error:", error);
+    return [];
   }
 };

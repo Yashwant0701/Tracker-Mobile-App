@@ -173,4 +173,51 @@ export const styles = StyleSheet.create({
   alignItems: "center",
   marginTop: 10,
 },
+
+paginationContainer: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  marginVertical: 12,
+  flexWrap: "wrap"
+},
+paginationButton: {
+  paddingVertical: 8,
+  paddingHorizontal: 12,
+  borderRadius: 6,
+  borderWidth: 1,
+  borderColor: "#E5E5E5",
+  marginHorizontal: 6,
+  backgroundColor: "#FFFFFF"
+},
+paginationButtonDisabled: {
+  opacity: 0.5
+},
+paginationButtonText: {
+  fontSize: 14,
+  fontFamily: Typography.fontFamilyOutfitLight,
+  color: "#000"
+},
+paginationPageNumber: {
+  paddingVertical: 6,
+  paddingHorizontal: 10,
+  marginHorizontal: 4,
+  borderRadius: 6,
+  borderWidth: 1,
+  borderColor: "#E5E5E5",
+  backgroundColor: "#FFFFFF"
+},
+paginationPageNumberActive: {
+  backgroundColor: "#FFC20F",
+  borderColor: "#FFC20F"
+},
+paginationPageNumberText: {
+  fontSize: 14,
+  fontFamily: Typography.fontFamilyOutfitLight,
+  color: "#000"
+},
+paginationPageNumberTextActive: {
+  color: "#FFF"
+},
+
 });
