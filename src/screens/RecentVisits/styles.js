@@ -8,7 +8,7 @@ import { Colors, Typography } from "../../theme";
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
+    backgroundColor: "#FFFFFF",
   },
 
   // Header
@@ -89,9 +89,11 @@ export const styles = StyleSheet.create({
 
   // Floating Filter Button
   filterButton: {
-    position: "absolute",
-    bottom: hp("3%"),
-    right: wp("5%"),
+     flexDirection: "row",
+    justifyContent: "flex-end",
+    paddingHorizontal: wp("5%"),
+    marginBottom: hp("3%"),
+    marginTop: hp("1%"),
   },
 
   noDataText: {

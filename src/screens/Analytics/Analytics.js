@@ -10,36 +10,55 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
+  Platform,
+  TextInput,
 } from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { styles } from "./styles";
 import { logout, fetchRecentVisits, getSalesUsers } from "../../api/AuthService";
 import { AuthContext } from "../../AuthContext";
 import { clearTokens } from "../../../tokenStorage";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Ionicons from "react-native-vector-icons/Ionicons";
+import {
+  widthPercentageToDP as wp,
+  heightPercentageToDP as hp,
+} from "react-native-responsive-screen";
 import { Typography } from "../../theme";
 
-// PAGE SIZE for visits (you selected 10)
-const VISITS_PAGE_SIZE = 10;
+const PAGE_SIZE = 10;
 
 const Analytics = ({ navigation }) => {
   const { currentUser, setCurrentUser } = useContext(AuthContext);
 
-  const [salesUsers, setSalesUsers] = useState([]); // objects from GetSalesUsers
+  // User selection
+  const [salesUsers, setSalesUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(true);
-  const [usersError, setUsersError] = useState("");
-
-  const [selectedUser, setSelectedUser] = useState(null); // will hold user object
+  const [selectedUser, setSelectedUser] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  // Visits pagination
-  const allVisitsRef = useRef([]); // store full visits array once fetched
-  const [visits, setVisits] = useState([]); // currently displayed (paged)
-  const [pageIndex, setPageIndex] = useState(1); // 1-based
-  const [totalPages, setTotalPages] = useState(0);
-  const [visitsLoading, setVisitsLoading] = useState(false);
-  const [visitsError, setVisitsError] = useState("");
+  // search inside modal
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // -------------------------- LOGOUT --------------------------
+  // Visits + Pagination
+  const allVisitsRef = useRef([]);
+  const filteredVisitsRef = useRef([]);
+  const [visits, setVisits] = useState([]);
+  const [loadingInitial, setLoadingInitial] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const scrollViewRef = useRef(null);
+
+  // Date range filter (two pickers)
+  const [showDatePickerFrom, setShowDatePickerFrom] = useState(false);
+  const [showDatePickerTo, setShowDatePickerTo] = useState(false);
+  const [rangeFrom, setRangeFrom] = useState(null);
+  const [rangeTo, setRangeTo] = useState(null);
+
+  // Temporary date for Android flow
+  const [tempSelectedDate, setTempSelectedDate] = useState(new Date());
+
+  // ---------------- LOGOUT ----------------
   const logoutUser = async () => {
     try {
       const result = await logout(currentUser);
@@ -54,7 +73,7 @@ const Analytics = ({ navigation }) => {
     }
   };
 
-  // -------------------------- FORMAT HELPERS --------------------------
+  // ---------------- Helpers ----------------
   const formatDate = (isoDate) => {
     if (!isoDate) return "N/A";
     const date = new Date(isoDate);
@@ -79,11 +98,10 @@ const Analytics = ({ navigation }) => {
 
   const calculateDuration = (checkinTime, checkoutTime) => {
     if (!checkinTime || !checkoutTime) return "0 sec";
-
     const start = new Date(checkinTime);
     const end = new Date(checkoutTime);
-    const diffMs = Math.abs(end - start);
 
+    const diffMs = Math.abs(end - start);
     const hours = Math.floor(diffMs / (1000 * 60 * 60));
     const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
     const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
@@ -96,197 +114,228 @@ const Analytics = ({ navigation }) => {
     return `${hours} hrs ${minutes} mts spent`;
   };
 
-  // -------------------------- GET SALES USERS --------------------------
+  // ---------------- LOAD SALES USERS ----------------
   useEffect(() => {
-    let mounted = true;
     const loadUsers = async () => {
       setUsersLoading(true);
-      setUsersError("");
       try {
-        // Get first page of sales users (PageSize 10, PageIndex 1)
         const resp = await getSalesUsers({ pageSize: 10, pageIndex: 1 });
-        // expect resp to be an array
-        if (!mounted) return;
 
         if (Array.isArray(resp)) {
-          // remove duplicates by accountId and keep first occurrence
-          const uniqueMap = new Map();
-          for (const u of resp) {
-            if (!uniqueMap.has(u.accountId)) uniqueMap.set(u.accountId, u);
-          }
-          const uniqueUsers = Array.from(uniqueMap.values());
-          setSalesUsers(uniqueUsers);
-          // default select first user if none selected
-          if (!selectedUser && uniqueUsers.length > 0) {
-            setSelectedUser(uniqueUsers[0]);
+          const map = new Map();
+          resp.forEach((u) => {
+            if (!map.has(u.accountId)) map.set(u.accountId, u);
+          });
+
+          const finalList = Array.from(map.values());
+          setSalesUsers(finalList);
+
+          if (!selectedUser && finalList.length > 0) {
+            setSelectedUser(finalList[0]);
           }
         } else {
           setSalesUsers([]);
-          setUsersError("No users found");
         }
       } catch (err) {
-        console.error("GetSalesUsers error:", err);
+        console.error("getSalesUsers error:", err);
         setSalesUsers([]);
-        setUsersError("Failed to fetch users");
       } finally {
-        if (mounted) setUsersLoading(false);
+        setUsersLoading(false);
       }
     };
 
     loadUsers();
-    return () => {
-      mounted = false;
-    };
-  }, []); // run once on mount
+  }, []);
 
-  // -------------------------- FETCH VISITS (all) FOR SELECTED USER --------------------------
+  // ---------------- LOAD VISITS ----------------
   useEffect(() => {
-    const loadVisitsForUser = async () => {
-      if (!selectedUser?.accountId) {
-        allVisitsRef.current = [];
-        setVisits([]);
-        setPageIndex(1);
-        setTotalPages(0);
-        setVisitsError("");
-        return;
-      }
+    const loadVisits = async () => {
+      if (!selectedUser?.accountId) return;
 
-      setVisitsLoading(true);
-      setVisitsError("");
-      setVisits([]); // clear while loading
+      setLoadingInitial(true);
+      setVisits([]);
       allVisitsRef.current = [];
-      setPageIndex(1);
+      filteredVisitsRef.current = [];
+      setRangeFrom(null);
+      setRangeTo(null);
+      setTempSelectedDate(new Date());
 
       try {
-        const response = await fetchRecentVisits(selectedUser.accountId);
-        if (response?.status === 200 && Array.isArray(response.data)) {
-          // sort newest-first
-          const sorted = response.data.sort(
+        const resp = await fetchRecentVisits(selectedUser.accountId);
+
+        if (resp?.status === 200 && Array.isArray(resp.data)) {
+          const sorted = resp.data.sort(
             (a, b) => new Date(b.checkinTime) - new Date(a.checkinTime)
           );
 
-          // store full list
           allVisitsRef.current = sorted;
 
-          // compute pages and set initial slice (page 1)
-          const total = sorted.length;
-          const pages = Math.ceil(total / VISITS_PAGE_SIZE) || 0;
-          setTotalPages(pages);
-          const initialSlice = sorted.slice(0, VISITS_PAGE_SIZE);
-          setVisits(initialSlice);
+          const firstPage = sorted.slice(0, PAGE_SIZE);
+          setVisits(firstPage);
+
+          setHasMore(sorted.length > PAGE_SIZE);
         } else {
           allVisitsRef.current = [];
           setVisits([]);
-          setTotalPages(0);
+          setHasMore(false);
         }
       } catch (err) {
         console.error("fetchRecentVisits error:", err);
         allVisitsRef.current = [];
         setVisits([]);
-        setTotalPages(0);
-        setVisitsError("Failed to fetch visits");
+        setHasMore(false);
       } finally {
-        setVisitsLoading(false);
+        setLoadingInitial(false);
+        setTimeout(() => {
+          scrollViewRef.current?.scrollTo({ x: 0, y: 0, animated: true });
+        }, 250);
       }
     };
 
-    loadVisitsForUser();
+    loadVisits();
   }, [selectedUser]);
 
-  // -------------------------- PAGE CHANGE EFFECT --------------------------
-  // When pageIndex changes, update current visits slice from allVisitsRef
-  useEffect(() => {
-    const total = allVisitsRef.current.length;
-    if (total === 0) {
-      setVisits([]);
-      setTotalPages(0);
+  // ---------------- GET BASE LIST for pagination ----------------
+  const getBaseList = () => {
+    if (rangeFrom && rangeTo) return filteredVisitsRef.current;
+    return allVisitsRef.current;
+  };
+
+  // ---------------- APPLY RANGE FILTER ----------------
+  const applyRangeFilter = (fromDate, toDate) => {
+    if (!fromDate || !toDate) {
+      // nothing to do
       return;
     }
 
-    const pages = Math.ceil(total / VISITS_PAGE_SIZE);
-    setTotalPages(pages);
+    // ensure from <= to
+    let start = new Date(fromDate);
+    let end = new Date(toDate);
+    // normalize time bounds to include whole days
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
 
-    // clamp pageIndex in range
-    let p = pageIndex;
-    if (p < 1) p = 1;
-    if (p > pages) p = pages;
-    if (p !== pageIndex) setPageIndex(p);
+    const filtered = allVisitsRef.current.filter((v) => {
+      try {
+        const vt = new Date(v.checkinTime).getTime();
+        return vt >= start.getTime() && vt <= end.getTime();
+      } catch {
+        return false;
+      }
+    });
 
-    const start = (p - 1) * VISITS_PAGE_SIZE;
-    const end = start + VISITS_PAGE_SIZE;
-    const slice = allVisitsRef.current.slice(start, end);
-    setVisits(slice);
-  }, [pageIndex]);
+    filteredVisitsRef.current = filtered;
+    setVisits(filtered.slice(0, PAGE_SIZE));
+    setHasMore(filtered.length > PAGE_SIZE);
 
-  // -------------------------- PAGINATION HANDLERS --------------------------
-  const goToPage = (p) => {
-    if (p < 1 || p > totalPages) return;
-    setPageIndex(p);
-    // scroll to top of scroll view would be nice — left to caller if needed
+    scrollViewRef.current?.scrollTo({ x: 0, y: 0, animated: true });
   };
 
-  const goPrev = () => {
-    if (pageIndex > 1) setPageIndex((prev) => prev - 1);
+  // ---------------- CLEAR FILTERS ----------------
+  const clearFilter = () => {
+    setRangeFrom(null);
+    setRangeTo(null);
+    filteredVisitsRef.current = [];
+    const firstPage = allVisitsRef.current.slice(0, PAGE_SIZE);
+    setVisits(firstPage);
+    setHasMore(allVisitsRef.current.length > PAGE_SIZE);
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ x: 0, y: 0, animated: true });
+    }, 150);
   };
 
-  const goNext = () => {
-    if (pageIndex < totalPages) setPageIndex((prev) => prev + 1);
+  // ---------------- LOAD MORE ----------------
+  const loadMore = () => {
+    if (loadingMore) return;
+
+    const baseList = getBaseList();
+    const count = visits.length;
+
+    if (count >= baseList.length) return;
+
+    setLoadingMore(true);
+
+    setTimeout(() => {
+      const more = baseList.slice(count, count + PAGE_SIZE);
+      setVisits((prev) => [...prev, ...more]);
+      setHasMore(count + PAGE_SIZE < baseList.length);
+      setLoadingMore(false);
+    }, 600);
   };
 
-  const renderPagination = () => {
-    if (totalPages <= 1) return null;
-
-    // Create array [1..totalPages]
-    const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
-
-    return (
-      <View style={styles.paginationContainer}>
-        <TouchableOpacity
-          onPress={goPrev}
-          disabled={pageIndex === 1}
-          style={[
-            styles.paginationButton,
-            pageIndex === 1 && styles.paginationButtonDisabled,
-          ]}
-        >
-          <Text style={styles.paginationButtonText}>Prev</Text>
-        </TouchableOpacity>
-
-        {pages.map((p) => (
-          <TouchableOpacity
-            key={p}
-            onPress={() => goToPage(p)}
-            style={[
-              styles.paginationPageNumber,
-              pageIndex === p && styles.paginationPageNumberActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.paginationPageNumberText,
-                pageIndex === p && styles.paginationPageNumberTextActive,
-              ]}
-            >
-              {p}
-            </Text>
-          </TouchableOpacity>
-        ))}
-
-        <TouchableOpacity
-          onPress={goNext}
-          disabled={pageIndex === totalPages}
-          style={[
-            styles.paginationButton,
-            pageIndex === totalPages && styles.paginationButtonDisabled,
-          ]}
-        >
-          <Text style={styles.paginationButtonText}>Next</Text>
-        </TouchableOpacity>
-      </View>
-    );
+  const handleScroll = (event) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const paddingToBottom = 40;
+    if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
+      loadMore();
+    }
   };
 
-  // -------------------------- UI --------------------------
+  // ---------------- DATE PICKER HANDLERS (range) ----------------
+  // Start by opening FROM picker: setShowDatePickerFrom(true)
+  // After FROM selected, open TO picker automatically.
+
+  const openRangePickers = () => {
+    // start FROM flow
+    setTempSelectedDate(new Date());
+    setShowDatePickerFrom(true);
+  };
+
+  const onFromChange = (event, selected) => {
+    // Android behaviour: event.type can be 'set' or 'dismissed'
+    if (Platform.OS === "android") {
+      if (event.type === "dismissed") {
+        setShowDatePickerFrom(false);
+        return;
+      }
+      if (event.type === "set") {
+        const chosen = selected || tempSelectedDate;
+        setRangeFrom(chosen);
+        setShowDatePickerFrom(false);
+        // open TO picker
+        setTimeout(() => setShowDatePickerTo(true), 120);
+      }
+      return;
+    }
+
+    // iOS: selected will be updated continuously; user will confirm by closing picker UI in native
+    if (selected) {
+      setRangeFrom(selected);
+      // open to picker if desired — on iOS we still open to picker immediately
+      setTimeout(() => setShowDatePickerTo(true), 120);
+    }
+  };
+
+  const onToChange = (event, selected) => {
+    if (Platform.OS === "android") {
+      if (event.type === "dismissed") {
+        setShowDatePickerTo(false);
+        return;
+      }
+      if (event.type === "set") {
+        const chosen = selected || tempSelectedDate;
+        setRangeTo(chosen);
+        setShowDatePickerTo(false);
+        // apply filter
+        setTimeout(() => applyRangeFilter(rangeFrom || chosen, chosen), 80);
+      }
+      return;
+    }
+
+    if (selected) {
+      setRangeTo(selected);
+      setTimeout(() => applyRangeFilter(rangeFrom || selected, selected), 80);
+    }
+  };
+
+  // ---------------- SEARCHED USERS (modal) ----------------
+  // live-filter the salesUsers by searchQuery
+  const filteredSalesUsers = salesUsers.filter((u) => {
+    if (!searchQuery?.trim()) return true;
+    return u.fullName?.toLowerCase().includes(searchQuery.trim().toLowerCase());
+  });
+
+  // ---------------- UI ----------------
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -294,27 +343,20 @@ const Analytics = ({ navigation }) => {
         <Text style={styles.headerTitle}>Analytics</Text>
 
         <TouchableOpacity style={styles.logoutButton} onPress={logoutUser}>
-          <Image source={require("../../assets/images/AdminLogoutIcon.png")} />
+          <Image source={require("../../assets/images/logoutIcon.png")} />
         </TouchableOpacity>
       </View>
 
       {/* Content */}
       <ScrollView
+        ref={scrollViewRef}
+        onScroll={handleScroll}
+        scrollEventThrottle={250}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Users loader/error */}
-        {usersLoading ? (
-          <ActivityIndicator size="small" color="#FFC20F" style={{ marginVertical: 10 }} />
-        ) : usersError ? (
-          <Text style={{ color: "red", marginVertical: 10 }}>{usersError}</Text>
-        ) : null}
-
-        {/* Visits list */}
-        {visitsLoading ? (
+        {loadingInitial ? (
           <ActivityIndicator size="large" color="#FFC20F" style={{ marginTop: 50 }} />
-        ) : visitsError ? (
-          <Text style={{ color: "red", marginTop: 20 }}>{visitsError}</Text>
         ) : visits.length > 0 ? (
           visits.map((visit, index) => {
             const date = formatDate(visit.checkinTime);
@@ -322,7 +364,7 @@ const Analytics = ({ navigation }) => {
             const duration = calculateDuration(visit.checkinTime, visit.checkoutTime);
 
             return (
-              <View key={`${visit.salesVisitId ?? index}-${index}`} style={styles.card}>
+              <View key={`${visit.salesVisitId}-${index}`} style={styles.card}>
                 <Text style={styles.doctorName}>
                   {visit.providerId ? `${visit.providerId}` : "N/A"}
                 </Text>
@@ -349,7 +391,7 @@ const Analytics = ({ navigation }) => {
                     <Image
                       source={require("../../assets/images/mapIcon.png")}
                       resizeMode="contain"
-                      style={{ width: 30, height: 30, marginLeft: 10 }}
+                      style={{ width: wp("8%"), height: wp("7%"), marginLeft: wp("2%") }}
                     />
                   </TouchableOpacity>
                 </View>
@@ -360,52 +402,157 @@ const Analytics = ({ navigation }) => {
           <Text style={styles.noDataText}>No recent visits found</Text>
         )}
 
-        {/* Pagination (bottom only) */}
-        {renderPagination()}
+        {loadingMore && (
+          <ActivityIndicator size="small" color="#FFC20F" style={{ marginVertical: hp("2%") }} />
+        )}
       </ScrollView>
 
-      {/* Bottom Bar (User dropdown + filter) */}
+      {/* Bottom Bar */}
       <View style={styles.bottomBar}>
         <TouchableOpacity
           style={styles.dropdownButton}
-          onPress={() => setModalVisible(true)}
+          onPress={() => {
+            setSearchQuery("");
+            setModalVisible(true);
+          }}
         >
           <Text style={styles.dropdownText}>{selectedUser?.fullName || "Select user"}</Text>
-          <Image source={require("../../assets/images/downArrow.png")} style={styles.dropdownIcon} />
+          <Image
+            source={require("../../assets/images/downArrow.png")}
+            style={styles.dropdownIcon}
+          />
         </TouchableOpacity>
 
-        <TouchableOpacity>
-          <Image source={require("../../assets/images/filterIcon.png")} resizeMode="contain" />
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          {(rangeFrom && rangeTo) ? (
+            <View style={styles.activeFilterContainer}>
+              <TouchableOpacity onPress={clearFilter} style={styles.clearFilterButton}>
+                <Ionicons name="close-circle-outline" size={24} color="#BCBCBC" />
+                <Text style={styles.clearFilterText}>
+                  Clear Filter
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
+          <TouchableOpacity
+            onPress={() => {
+              // open range pickers
+              openRangePickers();
+            }}
+            style={{ marginLeft: wp("2%") }}
+          >
+            <Image
+              source={require("../../assets/images/filterIcon.png")}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* User Selection Modal (no pagination) */}
+      {/* Date pickers (FROM & TO). They open sequentially. */}
+
+      {showDatePickerFrom && (
+        <DateTimePicker
+          value={rangeFrom || new Date()}
+          mode="date"
+          display={Platform.OS === "ios" ? "spinner" : "calendar"}
+          // FROM picker: prevent future dates (can't pick dates after today)
+          maximumDate={new Date()}
+          onChange={onFromChange}
+        />
+      )}
+
+      {showDatePickerTo && (
+        <DateTimePicker
+          value={rangeTo || (rangeFrom || new Date())}
+          mode="date"
+          display={Platform.OS === "ios" ? "spinner" : "calendar"}
+          // -------------------------
+          // DATE PICKER LOGIC UPDATED HERE
+          // TO picker should NOT allow selecting dates earlier than FROM
+          // and should NOT allow selecting future dates.
+          // We set:
+          //   - minimumDate = rangeFrom (if provided)
+          //   - maximumDate = today
+          // -------------------------
+          minimumDate={rangeFrom || undefined}
+          maximumDate={new Date()}
+          onChange={onToChange}
+        />
+      )}
+
+      {/* User Modal */}
       <Modal transparent visible={modalVisible} animationType="fade">
         <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
           <Pressable style={styles.modalContainer}>
             <Text style={styles.modalTitle}>Select a user</Text>
 
-            {salesUsers.map((user, index) => (
-              <Pressable
-                key={`${user.accountId}-${index}`}
-                style={styles.modalOption}
-                onPress={() => {
-                  setSelectedUser(user);
-                  setModalVisible(false);
+           
+            {/* Users list inside a scrollable area within modal */}
+            <ScrollView
+              style={{ marginTop: hp("1%"), maxHeight: hp("35%") }}
+              contentContainerStyle={{ paddingBottom: hp("1%") }}
+            >
+              {filteredSalesUsers.map((user, index) => (
+                <Pressable
+                  key={`${user.accountId}-${index}`}
+                  style={styles.modalUserBox}
+                  onPress={() => {
+                    setSelectedUser(user);
+                    setModalVisible(false);
+                  }}
+                >
+                  {/* Radio button */}
+                  <View
+                    style={[
+                      styles.modalRadioOuter,
+                      selectedUser?.accountId === user.accountId && { borderColor: "#2E7D32" }
+                    ]}
+                  >
+                    {selectedUser?.accountId === user.accountId && (
+                      <View style={styles.modalRadioInner} />
+                    )}
+                  </View>
+
+                  {/* User Name */}
+                  <Text style={styles.modalUserName}>{user.fullName}</Text>
+                </Pressable>
+              ))}
+
+              {filteredSalesUsers.length === 0 && !usersLoading && (
+                <Text style={{ textAlign: "center", marginTop: 10 }}>
+                  No users match your search.
+                </Text>
+              )}
+            </ScrollView>
+             {/* Search box (replica UI) */}
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={18} color="#BDBDBD" />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search with name"
+                placeholderTextColor="#BCBCBC"
+                style={{
+                  flex: 1,
+                  marginLeft: wp("2%"),
+                  fontSize: wp("4%"),
+                  height: "100%",
+                  color: "#000",
+                  fontFamily: Typography.fontFamilySatoshiRegular,
                 }}
-              >
-                <View style={[styles.radioOuter, selectedUser?.accountId === user.accountId && { borderColor: "#2E7D32" }]}>
-                  {selectedUser?.accountId === user.accountId && (
-                    <View style={[styles.radioInner, { backgroundColor: "#2E7D32" }]} />
-                  )}
-                </View>
+                returnKeyType="search"
+                underlineColorAndroid="transparent"
+              />
+            </View>
 
-                <Text style={styles.modalOptionText}>{user.fullName}</Text>
-              </Pressable>
-            ))}
 
-            {salesUsers.length === 0 && !usersLoading && (
-              <Text style={{ textAlign: "center", marginTop: 10 }}>No users available.</Text>
+            {/* If users are still loading show a small loader */}
+            {usersLoading && (
+              <View style={{ alignItems: "center", marginTop: hp("2%") }}>
+                <ActivityIndicator size="small" color="#FFC20F" />
+              </View>
             )}
           </Pressable>
         </Pressable>

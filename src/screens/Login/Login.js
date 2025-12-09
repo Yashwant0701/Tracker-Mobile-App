@@ -11,6 +11,7 @@ import {
   ScrollView,
   Modal,
   FlatList,
+  StyleSheet,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import CustomInput from "../../components/CustomInput";
@@ -18,17 +19,25 @@ import CustomButton from "../../components/CustomButton";
 import { login, fetchUserListByMobile } from "../../api/AuthService";
 import { AuthContext } from "../../AuthContext";
 import { styles } from "./styles";
+import Ionicons from "react-native-vector-icons/Ionicons";
 
 const LoginScreen = ({ navigation }) => {
   const { loginUser, setLoginApiResult, setAllUsers } = useContext(AuthContext);
 
   const [userName, setUserName] = useState("");
   const [password, setPassword] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [userList, setUserList] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
 
+  const [showPassword, setShowPassword] = useState(false);
+
   const isFormValid = userName.trim() !== "" && password.trim() !== "";
+
+  const togglePasswordVisibility = () => {
+    setShowPassword((prev) => !prev);
+  };
 
   const handleLogin = async () => {
     if (!isFormValid) return;
@@ -36,12 +45,11 @@ const LoginScreen = ({ navigation }) => {
 
     try {
       let adminResult = await login(userName, password);
-
       if (adminResult?.status === 200 && adminResult.data) {
         const roleName = adminResult.data.roleName?.toUpperCase();
 
         if (roleName === "ADMIN") {
-          //  Admin Login Flow
+          // Admin Login Flow
           await setLoginApiResult(adminResult.data);
           await loginUser(adminResult.data);
           navigation.replace("Analytics");
@@ -76,7 +84,6 @@ const LoginScreen = ({ navigation }) => {
         Alert.alert("Login Failed", "Invalid credentials or role.");
       }
     } catch (error) {
-      console.error("Login error:", error);
       Alert.alert("Error", "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
@@ -121,14 +128,28 @@ const LoginScreen = ({ navigation }) => {
             onChangeText={setUserName}
           />
 
-          {/* Password Input */}
-          <CustomInput
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={true}
-            maskCharacter="*"
-          />
+          {/* Password Input — wrapped to show/hide eye icon without modifying CustomInput */}
+          <View style={styles.passwordWrapper}>
+            <CustomInput
+              placeholder="Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              maskCharacter="*"
+            />
+            <TouchableOpacity
+              onPress={togglePasswordVisibility}
+              style={styles.eyeButton}
+              activeOpacity={0.7}
+              accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+            >
+              <Ionicons
+                name={showPassword ? "eye-off" : "eye"}
+                size={22}
+                color="#BCBCBC"
+              />
+            </TouchableOpacity>
+          </View>
 
           {/* Login Button */}
           <CustomButton

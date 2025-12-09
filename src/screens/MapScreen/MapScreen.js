@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text, ActivityIndicator } from "react-native";
+import { View, Text, ActivityIndicator, TouchableOpacity, Image } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import { useRoute } from "@react-navigation/native";
 import { styles } from "./styles";
 import { Colors } from "../../theme";
 import { getLocation } from "../../api/AuthService";
+import Icon from "react-native-vector-icons/Ionicons";
 
-const MapScreen = () => {
+const MapScreen = ({ navigation }) => {
   const route = useRoute();
   const { accountId, fullName } = route.params || {};
 
@@ -77,10 +78,16 @@ const MapScreen = () => {
 
   return (
     <View style={styles.container}>
+      <View style={styles.headerContainer}>
+ <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <Icon name="arrow-back" size={30} color={Colors.primary} />
+        </TouchableOpacity>
       {/* Header */}
       <Text style={styles.headerText}>
         Location of {fullName || "User"}
       </Text>
+      </View>
+      
 
       {/* Loading */}
       {loading && (

@@ -44,5 +44,12 @@ export const styles = StyleSheet.create({
     textAlign: "center",
     fontFamily: Typography.fontFamilyOutfitRegular,
   },
+   headerContainer:{
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: wp("4%"),
+    paddingVertical: hp("1%"),
+   }
+
 
 });

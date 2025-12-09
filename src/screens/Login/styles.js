@@ -140,4 +140,19 @@ export const styles = StyleSheet.create({
     color: "#fff",
     fontFamily: Typography.fontFamilyOutfitMedium,
   },
+   passwordWrapper: {
+    width: "100%",
+    position: "relative",
+    justifyContent: "center",
+    left:wp("1.5%"),
+  },
+  eyeButton: {
+    position: "absolute",
+    right: wp("3%"),
+    top: hp("1%"),
+    height: hp("5%"),
+    justifyContent: "center",
+    alignItems: "center",
+    padding: wp("2%"),
+  },
 });

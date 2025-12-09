@@ -16,4 +16,7 @@ export const Typography = {
   fontFamilyOutfitLight: "Outfit-Light",
   fontFamilySemibold: "Outfit-SemiBold",
   fontFamilyInterRegular: "Inter_18pt-Regular",
+  fontFamilySatoshiRegular: "Satoshi-Regular",
+  fontFamilySatoshiBold: "Satoshi-Bold",
+  fontFamilySatoshiMedium: "Satoshi-Medium",
 }

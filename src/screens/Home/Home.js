@@ -631,10 +631,10 @@ const openVisitModal = async (isEdit = false) => {
           {loadingImage ? (
             <ActivityIndicator size="small" color="#FFC20F" />
           ) : profileImage ? (
-            <Image source={profileImage} style={styles.profileImage} />
+            <Image source={profileImage} style={styles.profileImage} onPress={()=>navigation.navigate("UserProfile")}/>
           ) : (
-            <Icon name="person-circle-outline" size={hp("6.5%")} color="#FFC20F" />
-          )}
+            <Icon name="person-circle-outline" size={hp("6.5%")} color="#FFC20F" onPress={()=>navigation.navigate("UserProfile")}/>
+          ) }
           <View>
             <Text style={styles.welcomeText}>Welcome Back</Text>
             <Text style={styles.userName}>{currentUser?.fullName || "User"}</Text>
@@ -650,9 +650,7 @@ const openVisitModal = async (isEdit = false) => {
             />
           </TouchableOpacity>      
          )} 
-        <TouchableOpacity style={styles.bellButton}>
-          <Image source={require("../../assets/images/notificationsIcon.png")} style={styles.bellIcon} />
-        </TouchableOpacity>
+        
       </View>
 
       {/* Main Section */}
