@@ -28,6 +28,19 @@ import { Typography } from "../../theme";
 
 const PAGE_SIZE = 10;
 
+// ---------- Helper: Format Date Key ----------
+const dateKeyFromDate = (dateObj) => {
+  if (!dateObj) return "";
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(dateObj);
+  const [dd, mm, yyyy] = parts.split("/");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 const Analytics = ({ navigation }) => {
   const { currentUser, setCurrentUser } = useContext(AuthContext);
 
@@ -36,9 +49,6 @@ const Analytics = ({ navigation }) => {
   const [usersLoading, setUsersLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
-
-  // search inside modal
-  const [searchQuery, setSearchQuery] = useState("");
 
   // Visits + Pagination
   const allVisitsRef = useRef([]);
@@ -49,13 +59,13 @@ const Analytics = ({ navigation }) => {
   const [hasMore, setHasMore] = useState(false);
   const scrollViewRef = useRef(null);
 
-  // Date range filter (two pickers)
-  const [showDatePickerFrom, setShowDatePickerFrom] = useState(false);
-  const [showDatePickerTo, setShowDatePickerTo] = useState(false);
-  const [rangeFrom, setRangeFrom] = useState(null);
-  const [rangeTo, setRangeTo] = useState(null);
+  // Date Filter
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [filterDate, setFilterDate] = useState(null);
+   // search inside modal
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // Temporary date for Android flow
+  // Temporary date used for Android scroll change
   const [tempSelectedDate, setTempSelectedDate] = useState(new Date());
 
   // ---------------- LOGOUT ----------------
@@ -133,19 +143,54 @@ const Analytics = ({ navigation }) => {
           if (!selectedUser && finalList.length > 0) {
             setSelectedUser(finalList[0]);
           }
-        } else {
-          setSalesUsers([]);
         }
-      } catch (err) {
-        console.error("getSalesUsers error:", err);
-        setSalesUsers([]);
-      } finally {
+      } catch (_) {}
+      finally {
         setUsersLoading(false);
       }
     };
 
     loadUsers();
   }, []);
+
+  // ---------------- APPLY FILTER ----------------
+  const applyFilterWithDate = (dateObj) => {
+    if (!dateObj) return clearFilter();
+
+    const key = dateKeyFromDate(dateObj);
+
+    const filtered = allVisitsRef.current.filter((v) => {
+      try {
+        const visitDate = new Date(v.checkinTime);
+        return dateKeyFromDate(visitDate) === key;
+      } catch {
+        return false;
+      }
+    });
+
+    filteredVisitsRef.current = filtered;
+
+    const firstPage = filtered.slice(0, PAGE_SIZE);
+    setVisits(firstPage);
+    setHasMore(filtered.length > PAGE_SIZE);
+
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ x: 0, y: 0, animated: true });
+    }, 150);
+  };
+
+  const clearFilter = () => {
+    setFilterDate(null);
+    filteredVisitsRef.current = [];
+
+    const firstPage = allVisitsRef.current.slice(0, PAGE_SIZE);
+    setVisits(firstPage);
+    setHasMore(allVisitsRef.current.length > PAGE_SIZE);
+
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ x: 0, y: 0, animated: true });
+    }, 150);
+  };
 
   // ---------------- LOAD VISITS ----------------
   useEffect(() => {
@@ -156,9 +201,7 @@ const Analytics = ({ navigation }) => {
       setVisits([]);
       allVisitsRef.current = [];
       filteredVisitsRef.current = [];
-      setRangeFrom(null);
-      setRangeTo(null);
-      setTempSelectedDate(new Date());
+      setFilterDate(null);
 
       try {
         const resp = await fetchRecentVisits(selectedUser.accountId);
@@ -175,16 +218,11 @@ const Analytics = ({ navigation }) => {
 
           setHasMore(sorted.length > PAGE_SIZE);
         } else {
-          allVisitsRef.current = [];
-          setVisits([]);
           setHasMore(false);
         }
-      } catch (err) {
-        console.error("fetchRecentVisits error:", err);
-        allVisitsRef.current = [];
-        setVisits([]);
-        setHasMore(false);
-      } finally {
+      } catch (_) {}
+
+      finally {
         setLoadingInitial(false);
         setTimeout(() => {
           scrollViewRef.current?.scrollTo({ x: 0, y: 0, animated: true });
@@ -195,60 +233,11 @@ const Analytics = ({ navigation }) => {
     loadVisits();
   }, [selectedUser]);
 
-  // ---------------- GET BASE LIST for pagination ----------------
-  const getBaseList = () => {
-    if (rangeFrom && rangeTo) return filteredVisitsRef.current;
-    return allVisitsRef.current;
-  };
-
-  // ---------------- APPLY RANGE FILTER ----------------
-  const applyRangeFilter = (fromDate, toDate) => {
-    if (!fromDate || !toDate) {
-      // nothing to do
-      return;
-    }
-
-    // ensure from <= to
-    let start = new Date(fromDate);
-    let end = new Date(toDate);
-    // normalize time bounds to include whole days
-    start.setHours(0, 0, 0, 0);
-    end.setHours(23, 59, 59, 999);
-
-    const filtered = allVisitsRef.current.filter((v) => {
-      try {
-        const vt = new Date(v.checkinTime).getTime();
-        return vt >= start.getTime() && vt <= end.getTime();
-      } catch {
-        return false;
-      }
-    });
-
-    filteredVisitsRef.current = filtered;
-    setVisits(filtered.slice(0, PAGE_SIZE));
-    setHasMore(filtered.length > PAGE_SIZE);
-
-    scrollViewRef.current?.scrollTo({ x: 0, y: 0, animated: true });
-  };
-
-  // ---------------- CLEAR FILTERS ----------------
-  const clearFilter = () => {
-    setRangeFrom(null);
-    setRangeTo(null);
-    filteredVisitsRef.current = [];
-    const firstPage = allVisitsRef.current.slice(0, PAGE_SIZE);
-    setVisits(firstPage);
-    setHasMore(allVisitsRef.current.length > PAGE_SIZE);
-    setTimeout(() => {
-      scrollViewRef.current?.scrollTo({ x: 0, y: 0, animated: true });
-    }, 150);
-  };
-
   // ---------------- LOAD MORE ----------------
   const loadMore = () => {
     if (loadingMore) return;
 
-    const baseList = getBaseList();
+    const baseList = filterDate ? filteredVisitsRef.current : allVisitsRef.current;
     const count = visits.length;
 
     if (count >= baseList.length) return;
@@ -265,71 +254,44 @@ const Analytics = ({ navigation }) => {
 
   const handleScroll = (event) => {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+
     const paddingToBottom = 40;
+
     if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
       loadMore();
     }
   };
 
-  // ---------------- DATE PICKER HANDLERS (range) ----------------
-  // Start by opening FROM picker: setShowDatePickerFrom(true)
-  // After FROM selected, open TO picker automatically.
+  // ---------------- ANDROID DATE PICKER FIX ----------------
+  const onDateChange = (event, selected) => {
 
-  const openRangePickers = () => {
-    // start FROM flow
-    setTempSelectedDate(new Date());
-    setShowDatePickerFrom(true);
-  };
-
-  const onFromChange = (event, selected) => {
-    // Android behaviour: event.type can be 'set' or 'dismissed'
+    // For Android:
     if (Platform.OS === "android") {
       if (event.type === "dismissed") {
-        setShowDatePickerFrom(false);
+        // CANCEL pressed → close picker
+        setShowDatePicker(false);
         return;
       }
+
       if (event.type === "set") {
-        const chosen = selected || tempSelectedDate;
-        setRangeFrom(chosen);
-        setShowDatePickerFrom(false);
-        // open TO picker
-        setTimeout(() => setShowDatePickerTo(true), 120);
+        // OK pressed → apply selected date
+        const finalDate = selected || tempSelectedDate;
+        setFilterDate(finalDate);
+        applyFilterWithDate(finalDate);
+        setShowDatePicker(false);
       }
       return;
     }
 
-    // iOS: selected will be updated continuously; user will confirm by closing picker UI in native
+    // -------- iOS behavior (unchanged) --------
     if (selected) {
-      setRangeFrom(selected);
-      // open to picker if desired — on iOS we still open to picker immediately
-      setTimeout(() => setShowDatePickerTo(true), 120);
+      setTempSelectedDate(selected);
+      setFilterDate(selected);
+      applyFilterWithDate(selected);
     }
   };
 
-  const onToChange = (event, selected) => {
-    if (Platform.OS === "android") {
-      if (event.type === "dismissed") {
-        setShowDatePickerTo(false);
-        return;
-      }
-      if (event.type === "set") {
-        const chosen = selected || tempSelectedDate;
-        setRangeTo(chosen);
-        setShowDatePickerTo(false);
-        // apply filter
-        setTimeout(() => applyRangeFilter(rangeFrom || chosen, chosen), 80);
-      }
-      return;
-    }
-
-    if (selected) {
-      setRangeTo(selected);
-      setTimeout(() => applyRangeFilter(rangeFrom || selected, selected), 80);
-    }
-  };
-
-  // ---------------- SEARCHED USERS (modal) ----------------
-  // live-filter the salesUsers by searchQuery
+ // live-filter the salesUsers by searchQuery
   const filteredSalesUsers = salesUsers.filter((u) => {
     if (!searchQuery?.trim()) return true;
     return u.fullName?.toLowerCase().includes(searchQuery.trim().toLowerCase());
@@ -343,7 +305,7 @@ const Analytics = ({ navigation }) => {
         <Text style={styles.headerTitle}>Analytics</Text>
 
         <TouchableOpacity style={styles.logoutButton} onPress={logoutUser}>
-          <Image source={require("../../assets/images/logoutIcon.png")} />
+          <Image source={require("../../assets/images/AdminLogoutIcon.png")} />
         </TouchableOpacity>
       </View>
 
@@ -411,7 +373,8 @@ const Analytics = ({ navigation }) => {
       <View style={styles.bottomBar}>
         <TouchableOpacity
           style={styles.dropdownButton}
-          onPress={() => {
+          
+           onPress={() => {
             setSearchQuery("");
             setModalVisible(true);
           }}
@@ -424,21 +387,22 @@ const Analytics = ({ navigation }) => {
         </TouchableOpacity>
 
         <View style={{ flexDirection: "row", alignItems: "center" }}>
-          {(rangeFrom && rangeTo) ? (
+          {filterDate ? (
             <View style={styles.activeFilterContainer}>
-              <TouchableOpacity onPress={clearFilter} style={styles.clearFilterButton}>
-                <Ionicons name="close-circle-outline" size={24} color="#BCBCBC" />
-                <Text style={styles.clearFilterText}>
-                  Clear Filter
-                </Text>
+              <TouchableOpacity
+                onPress={clearFilter}
+                style={styles.clearFilterButton}
+              >
+                <Ionicons name="close-circle-outline" size={26} color="#BCBCBC" />
+                <Text style={styles.clearFilterText}>Clear Filter</Text>
               </TouchableOpacity>
             </View>
           ) : null}
 
           <TouchableOpacity
             onPress={() => {
-              // open range pickers
-              openRangePickers();
+              setTempSelectedDate(new Date()); // reset temp
+              setShowDatePicker(true);
             }}
             style={{ marginLeft: wp("2%") }}
           >
@@ -450,35 +414,14 @@ const Analytics = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Date pickers (FROM & TO). They open sequentially. */}
-
-      {showDatePickerFrom && (
+      {/* Android / iOS Date Picker */}
+      {showDatePicker && (
         <DateTimePicker
-          value={rangeFrom || new Date()}
+          value={filterDate || new Date()}
           mode="date"
           display={Platform.OS === "ios" ? "spinner" : "calendar"}
-          // FROM picker: prevent future dates (can't pick dates after today)
           maximumDate={new Date()}
-          onChange={onFromChange}
-        />
-      )}
-
-      {showDatePickerTo && (
-        <DateTimePicker
-          value={rangeTo || (rangeFrom || new Date())}
-          mode="date"
-          display={Platform.OS === "ios" ? "spinner" : "calendar"}
-          // -------------------------
-          // DATE PICKER LOGIC UPDATED HERE
-          // TO picker should NOT allow selecting dates earlier than FROM
-          // and should NOT allow selecting future dates.
-          // We set:
-          //   - minimumDate = rangeFrom (if provided)
-          //   - maximumDate = today
-          // -------------------------
-          minimumDate={rangeFrom || undefined}
-          maximumDate={new Date()}
-          onChange={onToChange}
+          onChange={onDateChange}
         />
       )}
 

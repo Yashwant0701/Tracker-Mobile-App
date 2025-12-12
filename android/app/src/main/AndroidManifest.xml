@@ -1,10 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.sujatracker">  <!-- 👈 ensure your app package name is correct -->
+    package="com.sujatracker">  <!--  ensure your app package name is correct -->
 
-    <!-- 🌐 Internet access -->
+    <!--  Internet access -->
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- 📍 Location permissions -->
+    <!--  Location permissions -->
     <!-- Precise location (GPS) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
@@ -14,16 +14,16 @@
     <!-- Background location (only if you actually need to track in background) -->
     <uses-permission
         android:name="android.permission.ACCESS_BACKGROUND_LOCATION"
-        android:maxSdkVersion="30" /> <!-- 👈 optional: background location restricted for Android 11+ -->
+        android:maxSdkVersion="30" /> <!--  optional: background location restricted for Android 11+ -->
 
-    <!-- 🔔 For Android 13+ notification permissions (if using push notifications) -->
+    <!--  For Android 13+ notification permissions (if using push notifications) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- 🧭 Optional: Check location service state -->
+    <!--  Optional: Check location service state -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
-    <!-- ✅ Required Google Maps API key for Geocoder / Maps SDK -->
+    <!--  Required Google Maps API key for Geocoder / Maps SDK -->
     <application
         android:name=".MainApplication"
         android:label="@string/app_name"

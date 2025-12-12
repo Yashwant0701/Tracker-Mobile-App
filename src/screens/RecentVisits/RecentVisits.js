@@ -1,3 +1,4 @@
+//RecentVisits
 import React, { useEffect, useState, useContext } from "react";
 import {
   View,
@@ -21,43 +22,39 @@ import { Typography } from "../../theme";
 
 const RecentVisits = ({ navigation }) => {
   const { currentUser } = useContext(AuthContext);
-
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Date range states
-  const [fromDate, setFromDate] = useState(null);
-  const [toDate, setToDate] = useState(null);
+  const [filterDate, setFilterDate] = useState(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // Picker control
-  const [showPicker, setShowPicker] = useState(false);
-  const [pickerMode, setPickerMode] = useState(null); // "from" or "to"
-
-  // Format date DD-MM-YYYY
+  // Format date as DD-MM-YYYY (Asia/Kolkata)
   const formatDate = (isoDate) => {
     if (!isoDate) return "N/A";
     const date = new Date(isoDate);
-    return new Intl.DateTimeFormat("en-GB", {
+    const options = {
       timeZone: "Asia/Kolkata",
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
-    }).format(date);
+    };
+    return new Intl.DateTimeFormat("en-GB", options).format(date);
   };
 
-  // Format hh:mm AM/PM
+  // Format time as hh:mm AM/PM (Asia/Kolkata)
   const formatTime = (isoDate) => {
     if (!isoDate) return "N/A";
     const date = new Date(isoDate);
-    return new Intl.DateTimeFormat("en-US", {
+    const options = {
       timeZone: "Asia/Kolkata",
       hour: "2-digit",
       minute: "2-digit",
       hour12: true,
-    }).format(date);
+    };
+    return new Intl.DateTimeFormat("en-US", options).format(date);
   };
 
-  // Duration calculator
+  // Duration calculation
   const calculateDuration = (checkinTime, checkoutTime) => {
     if (!checkinTime || !checkoutTime) return "0 sec";
 
@@ -82,11 +79,10 @@ const RecentVisits = ({ navigation }) => {
       if (minutes === 0) {
         return `${hours} hr${hours > 1 ? "s" : ""} spent`;
       }
-
       return `${hours} hr${hours > 1 ? "s" : ""} ${minutes} mt${
         minutes > 1 ? "s" : ""
       } spent`;
-    } catch {
+    } catch (err) {
       return "N/A";
     }
   };
@@ -107,7 +103,7 @@ const RecentVisits = ({ navigation }) => {
         } else {
           setVisits([]);
         }
-      } catch {
+      } catch (error) {
         setVisits([]);
       } finally {
         setLoading(false);
@@ -117,56 +113,40 @@ const RecentVisits = ({ navigation }) => {
     getVisits();
   }, [currentUser]);
 
-  // Apply range filter
+  // Filter visits by selected date (DD-MM-YYYY)
   const getFilteredVisits = () => {
-    if (!fromDate || !toDate) return visits;
+    if (!filterDate) return visits;
 
-    const from = new Date(fromDate);
-    const to = new Date(toDate);
-    to.setHours(23, 59, 59, 999);
+    const selected = formatDate(filterDate);
 
-    return visits.filter((v) => {
-      const visitTime = new Date(v.checkinTime);
-      return visitTime >= from && visitTime <= to;
-    });
+    return visits.filter((v) => formatDate(v.checkinTime) === selected);
+  };
+
+  const clearFilter = () => {
+    setFilterDate(null);
+  };
+
+  // DATE PICKER HANDLER — FIXED CANCEL ISSUE
+  const onDateChange = (event, selectedDate) => {
+    // Android "Cancel" press
+    if (event.type === "dismissed") {
+      setShowDatePicker(false);
+      return; // DO NOT set date
+    }
+
+    // Android "OK" press
+    if (event.type === "set" && selectedDate) {
+      setShowDatePicker(false);
+      setFilterDate(selectedDate); // APPLY DATE ONLY ON OK PRESS
+    }
+
+    // iOS always keeps picker open — handle only when a date is chosen
+    if (Platform.OS === "ios" && selectedDate) {
+      setFilterDate(selectedDate);
+    }
   };
 
   const filteredVisits = getFilteredVisits();
-
-  const clearFilter = () => {
-    setFromDate(null);
-    setToDate(null);
-  };
-
-  // Date Picker Handler
-  const onDateChange = (event, selectedDate) => {
-    if (event.type === "dismissed") {
-      setShowPicker(false);
-      return;
-    }
-
-    if (pickerMode === "from") {
-      setFromDate(selectedDate);
-      setShowPicker(false);
-
-      // Open TO date picker automatically
-      setTimeout(() => {
-        setPickerMode("to");
-        setShowPicker(true);
-      }, 300);
-    }
-
-    if (pickerMode === "to") {
-      setToDate(selectedDate);
-      setShowPicker(false);
-    }
-  };
-
-  // Open range picker
-  const openRangePicker = () => {
-    setPickerMode("from");
-    setShowPicker(true);
-  };
 
   return (
     <View style={styles.container}>
@@ -186,24 +166,13 @@ const RecentVisits = ({ navigation }) => {
       </View>
 
       {/* Date Picker */}
-      {showPicker && (
+      {showDatePicker && (
         <DateTimePicker
+          value={filterDate || new Date()}
           mode="date"
           display={Platform.OS === "ios" ? "spinner" : "default"}
+          maximumDate={new Date()}
           onChange={onDateChange}
-          value={
-            pickerMode === "from"
-              ? fromDate || new Date()
-              : toDate || fromDate || new Date()
-          }
-          maximumDate={
-            pickerMode === "from"
-              ? new Date() // FROM cannot select future
-              : new Date() // TO cannot select future
-          }
-          minimumDate={
-            pickerMode === "to" && fromDate ? fromDate : undefined
-          }
         />
       )}
 
@@ -252,35 +221,33 @@ const RecentVisits = ({ navigation }) => {
 
       {/* Filter Buttons */}
       <View style={styles.filterButton}>
-        {(fromDate || toDate) && (
-          <View
-            style={{
-              marginRight: wp("4%"),
-              alignItems: "center",
-              marginTop: hp("0.5%"),
-            }}
-          >
+        {filterDate ? (
+          <View style={{ marginRight: wp("4%"), alignItems: "center", marginTop: hp("0.5%") }}>
             <TouchableOpacity
               onPress={clearFilter}
               style={{ alignItems: "center", padding: wp("1%") }}
             >
-              <Ionicons name="close-circle-outline" size={28} color="#BCBCBC" />
+              <Ionicons
+                name="close-circle-outline"
+                size={28}
+                color="#BCBCBC"
+              />
               <Text
                 style={{
                   fontSize: wp("3%"),
                   color: "#BCBCBC",
                   marginTop: hp("0.2%"),
-                  fontFamily: Typography.fontFamilyOutfitRegular,
+                  fontFamily:Typography.fontFamilyOutfitRegular
                 }}
               >
                 Clear Filter
               </Text>
             </TouchableOpacity>
           </View>
-        )}
+        ) : null}
 
         <TouchableOpacity
-          onPress={openRangePicker}
+          onPress={() => setShowDatePicker(true)}
           style={{ marginLeft: wp("2%") }}
         >
           <Image
